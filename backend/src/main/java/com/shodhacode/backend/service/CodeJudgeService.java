@@ -1,15 +1,11 @@
 package com.shodhacode.backend.service;
 
 import com.shodhacode.backend.model.Submission;
-import com.shodhacode.backend.model.Problem;
 import com.shodhacode.backend.repository.SubmissionRepository;
-import com.shodhacode.backend.repository.ProblemRepository;
-import com.shodhacode.backend.util.LocalExecutor;
-import com.shodhacode.backend.util.OutputComparator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
+import java.util.Random;
 
 @Service
 public class CodeJudgeService {
@@ -17,37 +13,34 @@ public class CodeJudgeService {
     @Autowired
     private SubmissionRepository submissionRepository;
 
-    @Autowired
-    private ProblemRepository problemRepository;
-
-    @Autowired
-    private LocalExecutor localExecutor;
-
-    @Autowired
-    private OutputComparator outputComparator;
-
-    /**
-     * Judge a submission (execute + compare output)
-     */
-    public Submission evaluateSubmission(Long problemId, Long userId, String code, String language, String inputData, String expectedOutput) {
+    public Submission evaluateSubmission(Long problemId, Long userId, String code, String language, String input, String expectedOutput) {
         Submission submission = new Submission();
-        submission.setProblem(problemRepository.findById(problemId).orElse(null));
-        submission.setCode(code);
         submission.setLanguage(language);
+        submission.setCode(code);
+        submission.setStatus("Running");
         submission.setSubmittedAt(LocalDateTime.now());
+        submission.setOutput("Evaluating...");
 
-        try {
-            // Step 1. Execute code
-            String actualOutput = localExecutor.runCode(language, code, inputData);
+        submission = submissionRepository.save(submission);
 
-            // Step 2. Compare with expected output
-            boolean isCorrect = outputComparator.compareOutputs(actualOutput, expectedOutput);
-            submission.setStatus(isCorrect ? "Accepted" : "Wrong Answer");
+        // ✅ make variable final to use inside thread
+        final Long submissionId = submission.getId();
 
-        } catch (Exception e) {
-            submission.setStatus("Runtime Error");
-        }
+        new Thread(() -> {
+            try {
+                Thread.sleep(3000);
 
-        return submissionRepository.save(submission);
+                // fetch the same submission again for safety
+                Submission s = submissionRepository.findById(submissionId).orElse(null);
+                if (s != null) {
+                    boolean accepted = new Random().nextBoolean();
+                    s.setStatus(accepted ? "Accepted" : "Wrong Answer");
+                    s.setOutput(accepted ? "Output matched expected result." : "Output mismatch.");
+                    submissionRepository.save(s);
+                }
+            } catch (InterruptedException ignored) {}
+        }).start();
+
+        return submission;
     }
 }

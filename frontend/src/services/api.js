@@ -1,18 +1,16 @@
 import axios from "axios";
 
-// ✅ Create Axios instance with fallback URL
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8080",
 });
 
-// ✅ Fetch contest details
-export const getContest = (id) => API.get(`/api/contests/${id}`).then(res => res.data);
+// ✅ Contest endpoints
+export const getContest = (id) => API.get(`/api/contests/${id}`);
+export const getProblem = (contestId, problemId) => API.get(`/api/contests/${contestId}/problems/${problemId}`);
 
-// ✅ Submit code (judge)
-export const submitCode = (data) => API.post(`/api/judge`, data).then(res => res.data);
+// ✅ Submissions (used by ContestPage.jsx)
+export const createSubmission = (data) => API.post("/api/submissions", data);
+export const getSubmission = (id) => API.get(`/api/submissions/${id}`);
 
-// ✅ Get submission status
-export const getSubmission = (id) => API.get(`/api/submissions/${id}`).then(res => res.data);
-
-// ✅ Get leaderboard
-export const getLeaderboard = (id) => API.get(`/api/contests/${id}/leaderboard`).then(res => res.data);
+// ✅ Leaderboard
+export const getLeaderboard = (id) => API.get(`/api/contests/${id}/leaderboard`);
