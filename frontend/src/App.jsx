@@ -1,20 +1,19 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar";
-import Contests from "./pages/Contests";
-import Problems from "./pages/Problems";
-import Submit from "./pages/Submit";
-import Leaderboard from "./pages/Leaderboard";
+import { Routes, Route, Navigate } from "react-router-dom";
+import JoinPage from "./pages/JoinPage.jsx";
+import ContestPage from "./pages/ContestPage.jsx";
+import Navbar from "./components/Navbar.jsx";
+import { Toaster } from "react-hot-toast";
 
-function App() {
+export default function App() {
   return (
-    <div className="text-center mt-10">
-      <h1 className="text-4xl font-bold text-blue-600">
-        Tailwind Working 🎉
-      </h1>
-      <p className="text-gray-600 mt-2">Frontend setup complete ✅</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black text-gray-100">
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<JoinPage />} />
+        <Route path="/contest/:contestId" element={<ContestPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Toaster position="top-center" />
     </div>
   );
 }
-
-
-export default App;
