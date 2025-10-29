@@ -1,5 +1,6 @@
 package com.shodhacode.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 
 @Entity
@@ -13,9 +14,21 @@ public class Problem {
     private String inputFormat;
     private String outputFormat;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contest_id")
+    @JsonBackReference  // ✅ prevents infinite recursion (pairs with @JsonManagedReference in Contest)
     private Contest contest;
+
+    // Constructors
+    public Problem() {}
+
+    public Problem(String title, String description, String inputFormat, String outputFormat, Contest contest) {
+        this.title = title;
+        this.description = description;
+        this.inputFormat = inputFormat;
+        this.outputFormat = outputFormat;
+        this.contest = contest;
+    }
 
     // Getters and setters
     public Long getId() {

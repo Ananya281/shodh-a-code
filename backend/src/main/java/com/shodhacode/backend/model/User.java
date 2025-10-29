@@ -1,9 +1,11 @@
 package com.shodhacode.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import java.util.List;
 
 @Entity
-@Table(name = "users") // ✅ Fix reserved keyword issue
+@Table(name = "users") // ✅ Prevents conflict with reserved keyword "user"
 public class User {
 
     @Id
@@ -13,6 +15,19 @@ public class User {
     private String username;
     private String email;
     private int score;
+
+    // Optional: one-to-many mapping to submissions (for leaderboard / profile)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore   // ✅ Avoid circular references in JSON (user → submissions → user)
+    private List<Submission> submissions;
+
+    // Constructors
+    public User() {}
+    public User(String username, String email, int score) {
+        this.username = username;
+        this.email = email;
+        this.score = score;
+    }
 
     // Getters and Setters
     public Long getId() {
@@ -41,5 +56,12 @@ public class User {
     }
     public void setScore(int score) {
         this.score = score;
+    }
+
+    public List<Submission> getSubmissions() {
+        return submissions;
+    }
+    public void setSubmissions(List<Submission> submissions) {
+        this.submissions = submissions;
     }
 }

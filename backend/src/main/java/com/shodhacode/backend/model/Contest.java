@@ -1,5 +1,6 @@
 package com.shodhacode.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.util.List;
 
@@ -12,8 +13,17 @@ public class Contest {
     private String name;
     private String description;
 
-    @OneToMany(mappedBy = "contest", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "contest", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference   // ✅ prevents infinite recursion when serializing JSON
     private List<Problem> problems;
+
+    // Constructors
+    public Contest() {}
+
+    public Contest(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
 
     // Getters and setters
     public Long getId() {
