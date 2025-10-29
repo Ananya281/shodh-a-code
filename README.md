@@ -18,6 +18,7 @@ This project powers the **Shodh-a-Code** assignment, forming the backend REST AP
 ---
 
 ## 🧱 Project Structure
+```
 
 backend/
 ├── src/
@@ -38,7 +39,7 @@ backend/
 ├── mvnw / mvnw.cmd
 └── docker-compose.yml
 
-
+```
 ---
 
 ## ⚙️ Tech Stack
