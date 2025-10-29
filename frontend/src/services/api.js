@@ -5,12 +5,36 @@ const API = axios.create({
 });
 
 // ✅ Contest endpoints
-export const getContest = (id) => API.get(`/api/contests/${id}`);
-export const getProblem = (contestId, problemId) => API.get(`/api/contests/${contestId}/problems/${problemId}`);
+export const getContest = async (id) => {
+  const { data } = await API.get(`/api/contests/${id}`);
+  return data;
+};
 
-// ✅ Submissions (used by ContestPage.jsx)
-export const createSubmission = (data) => API.post("/api/submissions", data);
-export const getSubmission = (id) => API.get(`/api/submissions/${id}`);
+export const getProblem = async (contestId, problemId) => {
+  const { data } = await API.get(`/api/contests/${contestId}/problems/${problemId}`);
+  return data;
+};
+
+// ✅ Submissions (Create & Fetch)
+export const createSubmission = async ({ problemId, userId, language, code }) => {
+  const submissionPayload = {
+    code,
+    language,
+    user: { id: userId },
+    problem: { id: problemId },
+  };
+
+  const { data } = await API.post("/api/submissions", submissionPayload);
+  return data;
+};
+
+export const getSubmission = async (id) => {
+  const { data } = await API.get(`/api/submissions/${id}`);
+  return data;
+};
 
 // ✅ Leaderboard
-export const getLeaderboard = (id) => API.get(`/api/contests/${id}/leaderboard`);
+export const getLeaderboard = async (id) => {
+  const { data } = await API.get(`/api/contests/${id}/leaderboard`);
+  return data;
+};

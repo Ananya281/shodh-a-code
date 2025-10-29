@@ -17,6 +17,7 @@ export default function ContestPage() {
   const [code, setCode] = useState("");
   const [activeSubmissionId, setActiveSubmissionId] = useState(null);
 
+  // 🚨 Redirect if no username
   useEffect(() => {
     if (!username) {
       toast.error("No username found. Please join again.");
@@ -24,6 +25,7 @@ export default function ContestPage() {
     }
   }, [username]);
 
+  // ✅ Fetch contest and problems
   const { data: contest } = useQuery({
     queryKey: ["contest", contestId],
     queryFn: () => getContest(contestId),
@@ -31,8 +33,9 @@ export default function ContestPage() {
   });
 
   useEffect(() => {
-    if (contest && contest.problems?.length && !selectedProblemId)
+    if (contest && contest.problems?.length && !selectedProblemId) {
       setSelectedProblemId(contest.problems[0].id);
+    }
   }, [contest, selectedProblemId]);
 
   const { data: problem } = useQuery({
@@ -41,6 +44,7 @@ export default function ContestPage() {
     enabled: !!contestId && !!selectedProblemId,
   });
 
+  // ✅ Poll submission status while active
   const { data: submission, refetch: refetchSubmission } = useQuery({
     queryKey: ["submission", activeSubmissionId],
     queryFn: () => getSubmission(activeSubmissionId),
@@ -48,36 +52,50 @@ export default function ContestPage() {
     refetchInterval: activeSubmissionId ? 2500 : false,
   });
 
+  // ✅ Stop polling automatically when finished
   useEffect(() => {
     if (!submission) return;
-    const terminal = ["Accepted", "Wrong Answer", "Time Limit Exceeded", "Runtime Error", "Compilation Error", "System Error"].includes(submission.status);
-    if (terminal) setTimeout(() => setActiveSubmissionId(null), 500);
+    const terminalStates = [
+      "Accepted",
+      "Wrong Answer",
+      "Time Limit Exceeded",
+      "Runtime Error",
+      "Compilation Error",
+      "System Error",
+    ];
+    if (terminalStates.includes(submission.status)) {
+      setTimeout(() => setActiveSubmissionId(null), 800);
+    }
   }, [submission]);
 
+  // ✅ Handle submission
   async function handleSubmit() {
     if (!contest || !selectedProblemId) return;
     if (!code.trim()) return toast.error("Write some code before submitting!");
+
     try {
       const res = await createSubmission({
-        contestId: contest.id,
         problemId: selectedProblemId,
-        username,
+        userId: 1, // 🔧 temporary static user ID (replace later with dynamic)
         language,
         code,
       });
-      setActiveSubmissionId(res.submissionId);
-      toast.loading("Submitted. Judging started…", { id: "judge" });
-      setTimeout(() => refetchSubmission(), 300);
+
+      setActiveSubmissionId(res.id);
+      toast.loading("Submitted! Judging started…", { id: "judge" });
+      setTimeout(() => refetchSubmission(), 500);
     } catch (e) {
+      console.error(e);
       toast.error(e?.response?.data?.message ?? "Submission failed");
     }
   }
 
+  // ✅ Update status toasts
   useEffect(() => {
     if (!submission) return;
-    if (submission.status === "Running")
-      toast.loading("Running against tests…", { id: "judge" });
-    else {
+    if (submission.status === "Running") {
+      toast.loading("Running against test cases…", { id: "judge" });
+    } else {
       toast.dismiss("judge");
       submission.status === "Accepted"
         ? toast.success("✅ Accepted")
@@ -85,13 +103,17 @@ export default function ContestPage() {
     }
   }, [submission]);
 
+  // ✅ UI
   return (
     <div className="min-h-screen bg-[#0b0f19] text-gray-100 p-4 md:p-6">
       <header className="flex items-center justify-between mb-5 border-b border-gray-700 pb-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">{contest?.name ?? "Contest Arena"}</h1>
+          <h1 className="text-2xl font-bold text-white">
+            {contest?.name ?? "Contest Arena"}
+          </h1>
           <p className="text-sm text-gray-400">
-            Signed in as <span className="font-medium text-blue-400">{username}</span>
+            Signed in as{" "}
+            <span className="font-medium text-blue-400">{username}</span>
           </p>
         </div>
         <div className="flex gap-2">
@@ -116,7 +138,7 @@ export default function ContestPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
-        {/* Problems List */}
+        {/* ✅ Problems List */}
         <div className="lg:col-span-1 bg-gray-900 rounded-xl p-4 shadow-md border border-gray-800">
           <h2 className="font-semibold text-lg mb-3 text-blue-400">Problems</h2>
           <ul className="space-y-2">
@@ -145,7 +167,7 @@ export default function ContestPage() {
           </div>
         </div>
 
-        {/* Editor */}
+        {/* ✅ Editor */}
         <div className="lg:col-span-2 bg-gray-900 rounded-xl shadow-md border border-gray-800 flex flex-col">
           <div className="flex-1 p-3">
             <EditorPanel language={language} code={code} setCode={setCode} />
@@ -161,7 +183,7 @@ export default function ContestPage() {
           </div>
         </div>
 
-        {/* Leaderboard */}
+        {/* ✅ Leaderboard */}
         <div className="lg:col-span-1 bg-gray-900 rounded-xl p-4 shadow-md border border-gray-800">
           <Leaderboard contestId={contestId} />
         </div>

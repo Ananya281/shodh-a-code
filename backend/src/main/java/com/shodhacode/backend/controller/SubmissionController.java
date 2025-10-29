@@ -7,7 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/submissions") // ✅ match frontend route
+@RequestMapping("/api/submissions")
+@CrossOrigin(origins = "*") // ✅ allow frontend (React) to connect
 public class SubmissionController {
 
     @Autowired
@@ -16,23 +17,30 @@ public class SubmissionController {
     @Autowired
     private SubmissionRepository submissionRepository;
 
-    // ✅ POST: create + judge new submission
+    // ✅ POST: Create + Judge new submission
     @PostMapping
     public Submission judgeCode(@RequestBody Submission submission) {
-        // This allows React’s createSubmission() payload:
-        // { contestId, problemId, username, language, code }
-        return codeJudgeService.evaluateSubmission(
+        if (submission.getProblem() == null || submission.getUser() == null) {
+            throw new IllegalArgumentException("❌ Missing problem or user details in submission");
+        }
+
+        // Evaluate submission
+        Submission evaluated = codeJudgeService.evaluateSubmission(
                 submission.getProblem().getId(),
                 submission.getUser().getId(),
                 submission.getCode(),
                 submission.getLanguage(),
-                "", ""  // optional input/output placeholders
+                "", ""  // Placeholder input/output
         );
+
+        // Persist the evaluated result
+        return submissionRepository.save(evaluated);
     }
 
-    // ✅ GET: for polling
+    // ✅ GET: Polling by submissionId
     @GetMapping("/{id}")
     public Submission getSubmissionById(@PathVariable Long id) {
-        return submissionRepository.findById(id).orElse(null);
+        return submissionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Submission not found"));
     }
 }
