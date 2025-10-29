@@ -2,7 +2,9 @@ package com.shodhacode.backend.repository;
 
 import com.shodhacode.backend.model.Submission;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import java.util.List;
 
-@Repository
-public interface SubmissionRepository extends JpaRepository<Submission, Long> { }
+public interface SubmissionRepository extends JpaRepository<Submission, Long> {
+    // all submissions whose problem belongs to a given contest
+    List<Submission> findByProblem_Contest_Id(Long contestId);
+}

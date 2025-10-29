@@ -1,4 +1,4 @@
-import { getContest, submitCode, getSubmission, getLeaderboard } from "./services/api.js";
+import { getContest, getLeaderboard } from "./services/api.js";
 
 async function testAPI() {
   try {
