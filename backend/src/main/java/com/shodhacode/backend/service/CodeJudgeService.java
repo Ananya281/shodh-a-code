@@ -121,26 +121,36 @@ public class CodeJudgeService {
         Files.writeString(tmpDir.resolve("input.txt"),
                 input == null ? "" : input, StandardCharsets.UTF_8);
 
-        // ✅ Inner command to run inside Docker
+        // ✅ Build the inner Docker command
         String innerCmd = String.format(
                 "cd /home/runner/work && %s && timeout 5s %s < input.txt > output.txt 2>&1",
                 compileCmd.isBlank() ? "true" : compileCmd,
                 runCmd
         );
 
-        // ✅ Construct full docker run command
+        // 🧩 Fix Windows path for Docker volume mount
+        String volumePath = tmpDir.toAbsolutePath().toString();
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            volumePath = volumePath.replace("\\", "/");
+            if (volumePath.charAt(1) == ':') {
+                volumePath = "/" + Character.toLowerCase(volumePath.charAt(0)) + volumePath.substring(2);
+            }
+        }
+
+        // ✅ Construct final Docker command
         List<String> command = List.of(
                 dockerCmd, "run", "--rm",
+                "--platform=linux/amd64",
                 "--network=none",
                 "--cpus=1", "--memory=256m",
-                "-v", tmpDir.toAbsolutePath() + ":/home/runner/work",
+                "-v", volumePath + ":/home/runner/work",
                 "shodha/judge:latest",
                 "bash", "-c", innerCmd
         );
 
         System.out.println("🚀 Running Docker Command: " + String.join(" ", command));
 
-        // ✅ Execute docker command
+        // ✅ Execute the Docker command
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
         Process process = pb.start();
@@ -164,7 +174,7 @@ public class CodeJudgeService {
         System.out.println("🖨️ Program Output: " + safeOutput);
         System.out.println("🧠 Expected Output: " + safeExpected);
 
-        // ✅ Exit code or mismatch handling
+        // ✅ Handle result conditions
         if (exitCode != 0) return "Runtime Error";
         if (safeExpected.isEmpty()) return safeOutput.isEmpty() ? "Empty Output" : "Accepted";
         return safeOutput.equals(safeExpected) ? "Accepted" : "Wrong Answer";

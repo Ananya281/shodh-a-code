@@ -16,8 +16,41 @@ export default function ContestPage() {
 
   const [selectedProblemId, setSelectedProblemId] = useState(null);
   const [language, setLanguage] = useState(LANGUAGES[0].value);
-  const [code, setCode] = useState("");
   const [activeSubmissionId, setActiveSubmissionId] = useState(null);
+
+  // 🧩 Boilerplates per language
+  const BOILERPLATES = {
+    python: `# 🐍 Python Template
+# Write your solution below:
+print("Hello World")`,
+
+    java: `// ☕ Java Template
+class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello World");
+    }
+}`,
+
+    cpp: `// ⚙️ C++ Template
+#include <bits/stdc++.h>
+using namespace std;
+int main() {
+    cout << "Hello World";
+    return 0;
+}`
+  };
+
+  // ✅ Maintain separate code for each language
+  const [codeByLang, setCodeByLang] = useState({
+    python: BOILERPLATES.python,
+    java: BOILERPLATES.java,
+    cpp: BOILERPLATES.cpp,
+  });
+
+  // current editor code
+  const code = codeByLang[language];
+  const setCode = (newCode) =>
+    setCodeByLang((prev) => ({ ...prev, [language]: newCode }));
 
   // 🚨 Redirect if no username
   useEffect(() => {
@@ -27,26 +60,28 @@ export default function ContestPage() {
     }
   }, [username]);
 
-  // ✅ Fetch contest and problems
+  // ✅ Fetch contest
   const { data: contest } = useQuery({
     queryKey: ["contest", contestId],
     queryFn: () => getContest(contestId),
     enabled: !!contestId,
   });
 
+  // ✅ Select first problem automatically
   useEffect(() => {
     if (contest && contest.problems?.length && !selectedProblemId) {
       setSelectedProblemId(contest.problems[0].id);
     }
   }, [contest, selectedProblemId]);
 
+  // ✅ Fetch selected problem
   const { data: problem } = useQuery({
     queryKey: ["problem", contestId, selectedProblemId],
     queryFn: () => getProblem(contestId, selectedProblemId),
     enabled: !!contestId && !!selectedProblemId,
   });
 
-  // ✅ Poll submission status
+  // ✅ Poll submission
   const { data: submission, refetch: refetchSubmission } = useQuery({
     queryKey: ["submission", activeSubmissionId],
     queryFn: () => getSubmission(activeSubmissionId),
@@ -54,7 +89,7 @@ export default function ContestPage() {
     refetchInterval: activeSubmissionId ? 2500 : false,
   });
 
-  // ✅ Stop polling when done
+  // ✅ Stop polling when finished
   useEffect(() => {
     if (!submission) return;
     const finished = [
@@ -66,7 +101,7 @@ export default function ContestPage() {
     }
   }, [submission]);
 
-  // ✅ Handle submission
+  // ✅ Submit handler
   async function handleSubmit() {
     if (!contest || !selectedProblemId) return;
     if (!code.trim()) return toast.error("Write some code before submitting!");
@@ -79,12 +114,11 @@ export default function ContestPage() {
         code,
       });
 
-      const id = res.id || res.submissionId || res.data?.id; // ✅ covers all backend cases
+      const id = res.id || res.submissionId || res.data?.id;
       if (!id) throw new Error("Submission ID not returned from backend");
 
       setActiveSubmissionId(id);
       toast.loading("Submitted! Judging started…", { id: "judge" });
-
       setTimeout(() => refetchSubmission(), 500);
     } catch (err) {
       console.error(err);
@@ -92,7 +126,7 @@ export default function ContestPage() {
     }
   }
 
-  // ✅ Toast updates for submission status
+  // ✅ Submission toast feedback
   useEffect(() => {
     if (!submission) return;
     if (submission.status === "Running") {
@@ -104,6 +138,11 @@ export default function ContestPage() {
       else toast.error(submission.status);
     }
   }, [submission]);
+
+  // ✅ Handle language switch
+  function handleLanguageChange(newLang) {
+    setLanguage(newLang);
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-gray-100 p-4 md:p-6">
@@ -118,7 +157,7 @@ export default function ContestPage() {
         <div className="flex gap-2">
           <select
             value={language}
-            onChange={(e) => setLanguage(e.target.value)}
+            onChange={(e) => handleLanguageChange(e.target.value)}
             className="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none"
           >
             {LANGUAGES.map((l) => (
@@ -137,7 +176,7 @@ export default function ContestPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
-        {/* 🧩 Problems List */}
+        {/* 🧩 Problem List */}
         <div className="lg:col-span-1 bg-gray-900 rounded-xl p-4 shadow-md border border-gray-800">
           <h2 className="font-semibold text-lg mb-3 text-blue-400">Problems</h2>
           <ul className="space-y-2">
