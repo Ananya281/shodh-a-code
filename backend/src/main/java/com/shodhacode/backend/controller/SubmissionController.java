@@ -1,14 +1,14 @@
 package com.shodhacode.backend.controller;
 
 import com.shodhacode.backend.model.Submission;
-import com.shodhacode.backend.service.CodeJudgeService;
 import com.shodhacode.backend.repository.SubmissionRepository;
+import com.shodhacode.backend.service.CodeJudgeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/submissions")
-@CrossOrigin(origins = "*") // ✅ allow frontend (React) to connect
+@CrossOrigin(origins = "*") // allow frontend access
 public class SubmissionController {
 
     @Autowired
@@ -17,30 +17,30 @@ public class SubmissionController {
     @Autowired
     private SubmissionRepository submissionRepository;
 
-    // ✅ POST: Create + Judge new submission
+    // ✅ POST: create + judge submission
     @PostMapping
     public Submission judgeCode(@RequestBody Submission submission) {
         if (submission.getProblem() == null || submission.getUser() == null) {
             throw new IllegalArgumentException("❌ Missing problem or user details in submission");
         }
 
-        // Evaluate submission
-        Submission evaluated = codeJudgeService.evaluateSubmission(
+        // ✅ Trigger judge service
+        Submission saved = codeJudgeService.evaluateSubmission(
                 submission.getProblem().getId(),
                 submission.getUser().getId(),
                 submission.getCode(),
                 submission.getLanguage(),
-                "", ""  // Placeholder input/output
+                "", ""
         );
 
-        // Persist the evaluated result
-        return submissionRepository.save(evaluated);
+        // ✅ Return the same saved submission object (already has ID)
+        return saved;
     }
 
-    // ✅ GET: Polling by submissionId
+    // ✅ GET: fetch submission status (for polling)
     @GetMapping("/{id}")
     public Submission getSubmissionById(@PathVariable Long id) {
         return submissionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Submission not found"));
+                .orElseThrow(() -> new RuntimeException("❌ Submission not found"));
     }
 }

@@ -12,6 +12,8 @@ import toast from "react-hot-toast";
 export default function ContestPage() {
   const { contestId = "" } = useParams();
   const username = useMemo(() => sessionStorage.getItem("shodha_username") || "", []);
+  const userId = useMemo(() => sessionStorage.getItem("shodha_userId") || 1, []); // ✅ dynamic fallback
+
   const [selectedProblemId, setSelectedProblemId] = useState(null);
   const [language, setLanguage] = useState(LANGUAGES[0].value);
   const [code, setCode] = useState("");
@@ -44,7 +46,7 @@ export default function ContestPage() {
     enabled: !!contestId && !!selectedProblemId,
   });
 
-  // ✅ Poll submission status while active
+  // ✅ Poll submission status
   const { data: submission, refetch: refetchSubmission } = useQuery({
     queryKey: ["submission", activeSubmissionId],
     queryFn: () => getSubmission(activeSubmissionId),
@@ -52,19 +54,15 @@ export default function ContestPage() {
     refetchInterval: activeSubmissionId ? 2500 : false,
   });
 
-  // ✅ Stop polling automatically when finished
+  // ✅ Stop polling when done
   useEffect(() => {
     if (!submission) return;
-    const terminalStates = [
-      "Accepted",
-      "Wrong Answer",
-      "Time Limit Exceeded",
-      "Runtime Error",
-      "Compilation Error",
-      "System Error",
+    const finished = [
+      "Accepted", "Wrong Answer", "Time Limit Exceeded",
+      "Runtime Error", "Compilation Error", "System Error"
     ];
-    if (terminalStates.includes(submission.status)) {
-      setTimeout(() => setActiveSubmissionId(null), 800);
+    if (finished.includes(submission.status)) {
+      setTimeout(() => setActiveSubmissionId(null), 1000);
     }
   }, [submission]);
 
@@ -76,46 +74,47 @@ export default function ContestPage() {
     try {
       const res = await createSubmission({
         problemId: selectedProblemId,
-        userId: 1, // 🔧 temporary static user ID (replace later with dynamic)
+        userId,
         language,
         code,
       });
 
-      setActiveSubmissionId(res.id);
+      const id = res.id || res.submissionId || res.data?.id; // ✅ covers all backend cases
+      if (!id) throw new Error("Submission ID not returned from backend");
+
+      setActiveSubmissionId(id);
       toast.loading("Submitted! Judging started…", { id: "judge" });
+
       setTimeout(() => refetchSubmission(), 500);
-    } catch (e) {
-      console.error(e);
-      toast.error(e?.response?.data?.message ?? "Submission failed");
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Submission failed");
     }
   }
 
-  // ✅ Update status toasts
+  // ✅ Toast updates for submission status
   useEffect(() => {
     if (!submission) return;
     if (submission.status === "Running") {
-      toast.loading("Running against test cases…", { id: "judge" });
+      toast.loading("Running test cases…", { id: "judge" });
     } else {
       toast.dismiss("judge");
-      submission.status === "Accepted"
-        ? toast.success("✅ Accepted")
-        : toast.error(submission.status);
+      if (submission.status === "Accepted")
+        toast.success("✅ Accepted");
+      else toast.error(submission.status);
     }
   }, [submission]);
 
-  // ✅ UI
   return (
     <div className="min-h-screen bg-[#0b0f19] text-gray-100 p-4 md:p-6">
       <header className="flex items-center justify-between mb-5 border-b border-gray-700 pb-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">
-            {contest?.name ?? "Contest Arena"}
-          </h1>
+          <h1 className="text-2xl font-bold text-white">{contest?.name ?? "Contest Arena"}</h1>
           <p className="text-sm text-gray-400">
-            Signed in as{" "}
-            <span className="font-medium text-blue-400">{username}</span>
+            Signed in as <span className="font-medium text-blue-400">{username}</span>
           </p>
         </div>
+
         <div className="flex gap-2">
           <select
             value={language}
@@ -138,7 +137,7 @@ export default function ContestPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
-        {/* ✅ Problems List */}
+        {/* 🧩 Problems List */}
         <div className="lg:col-span-1 bg-gray-900 rounded-xl p-4 shadow-md border border-gray-800">
           <h2 className="font-semibold text-lg mb-3 text-blue-400">Problems</h2>
           <ul className="space-y-2">
@@ -146,9 +145,7 @@ export default function ContestPage() {
               <li key={p.id}>
                 <button
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${
-                    p.id === selectedProblemId
-                      ? "bg-blue-700 text-white"
-                      : "hover:bg-gray-800"
+                    p.id === selectedProblemId ? "bg-blue-700 text-white" : "hover:bg-gray-800"
                   }`}
                   onClick={() => setSelectedProblemId(p.id)}
                 >
@@ -167,7 +164,7 @@ export default function ContestPage() {
           </div>
         </div>
 
-        {/* ✅ Editor */}
+        {/* 🧠 Code Editor */}
         <div className="lg:col-span-2 bg-gray-900 rounded-xl shadow-md border border-gray-800 flex flex-col">
           <div className="flex-1 p-3">
             <EditorPanel language={language} code={code} setCode={setCode} />
@@ -183,7 +180,7 @@ export default function ContestPage() {
           </div>
         </div>
 
-        {/* ✅ Leaderboard */}
+        {/* 🏆 Leaderboard */}
         <div className="lg:col-span-1 bg-gray-900 rounded-xl p-4 shadow-md border border-gray-800">
           <Leaderboard contestId={contestId} />
         </div>

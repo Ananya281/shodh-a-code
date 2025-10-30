@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDateTime;
@@ -23,119 +23,163 @@ public class CodeJudgeService {
     @Autowired private UserRepository userRepository;
     @Autowired private SubmissionRepository submissionRepository;
 
-    @Async
-    public void evaluateSubmissionAsync(Long problemId, Long userId, String code, String language) {
+    /**
+     * Triggered by controller — immediately returns "Pending" to frontend
+     * and then asynchronously judges the code in Docker.
+     */
+    public Submission evaluateSubmission(Long problemId, Long userId, String code, String language,
+                                         String input, String output) {
+
         Problem problem = problemRepository.findById(problemId).orElseThrow();
         User user = userRepository.findById(userId).orElseThrow();
 
+        // Create new submission entry
         Submission submission = new Submission();
         submission.setProblem(problem);
         submission.setUser(user);
         submission.setCode(code);
         submission.setLanguage(language);
-        submission.setStatus("Running");
+        submission.setStatus("Pending");
         submission.setSubmittedAt(LocalDateTime.now());
         submissionRepository.save(submission);
 
+        // Run the judge asynchronously
+        evaluateSubmissionAsync(submission.getId(), problemId, userId, code, language);
+
+        return submission;
+    }
+
+    /**
+     * Asynchronous code execution inside Docker container.
+     */
+    @Async
+    public void evaluateSubmissionAsync(Long submissionId, Long problemId, Long userId,
+                                        String code, String language) {
         try {
-            String result = runCodeInDocker(code, language, problem.getInputData(), problem.getExpectedOutput());
+            Problem problem = problemRepository.findById(problemId).orElseThrow();
+            Submission submission = submissionRepository.findById(submissionId).orElseThrow();
+
+            submission.setStatus("Running");
+            submissionRepository.save(submission);
+
+            // Run the code in Docker and capture result
+            String result = runCodeInDocker(code, language,
+                    problem.getInputData(), problem.getExpectedOutput());
+
             submission.setStatus(result);
         } catch (Exception e) {
             e.printStackTrace();
-            submission.setStatus("System Error");
+            Submission s = submissionRepository.findById(submissionId).orElse(null);
+            if (s != null) s.setStatus("System Error");
         } finally {
-            submission.setSubmittedAt(LocalDateTime.now());
-            submissionRepository.save(submission);
+            Submission s = submissionRepository.findById(submissionId).orElse(null);
+            if (s != null) {
+                s.setSubmittedAt(LocalDateTime.now());
+                submissionRepository.save(s);
+            }
         }
     }
 
-    private String runCodeInDocker(String code, String language, String input, String expectedOutput) throws Exception {
-        Path tmpDir = Files.createTempDirectory("judge_");
-        try {
-            String filename;
-            String compileCmd = "";
-            String runCmd;
+    /**
+     * Runs given code safely inside a Docker container and compares output.
+     */
+    private String runCodeInDocker(String code, String language,
+                               String input, String expectedOutput) throws Exception {
 
-            // Language specific logic
-            switch (language.toLowerCase()) {
-                case "java":
-                    filename = "Main.java";
-                    compileCmd = "javac Main.java";
-                    runCmd = "timeout 5s java Main";
-                    break;
-                case "cpp":
-                case "c++":
-                    filename = "main.cpp";
-                    compileCmd = "g++ -O2 -std=c++17 main.cpp -o main";
-                    runCmd = "timeout 5s ./main";
-                    break;
-                case "python":
-                case "py":
-                    filename = "main.py";
-                    runCmd = "timeout 5s python3 main.py";
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unsupported language: " + language);
+    Path tmpDir = Files.createTempDirectory("judge_");
+    try {
+        String filename;
+        String compileCmd = "";
+        String runCmd;
+
+        // ✅ Detect Docker binary path (Windows vs Linux)
+        String dockerCmd = System.getProperty("os.name").toLowerCase().contains("win")
+                ? "C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe"
+                : "docker";
+
+        // ✅ Select commands based on language
+        switch (language.toLowerCase()) {
+            case "java" -> {
+                filename = "Main.java";
+                compileCmd = "javac Main.java";
+                runCmd = "java Main";
             }
-
-            // Write code & input files
-            Files.writeString(tmpDir.resolve(filename), code, StandardCharsets.UTF_8);
-            Files.writeString(tmpDir.resolve("input.txt"), input == null ? "" : input, StandardCharsets.UTF_8);
-
-            // Docker command
-            String dockerCmd = String.format(
-                    "cd /home/runner/work && %s && %s < input.txt > output.txt 2>&1",
-                    compileCmd, runCmd
-            );
-
-            List<String> command = Arrays.asList(
-                    "docker", "run", "--rm",
-                    "--network=none",
-                    "--cpus=1", "--memory=256m",
-                    "-v", tmpDir.toAbsolutePath() + ":/home/runner/work",
-                    "shodha/judge:latest",
-                    "bash", "-c", dockerCmd
-            );
-
-            ProcessBuilder pb = new ProcessBuilder(command);
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            // Capture docker output (logs)
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                reader.lines().forEach(System.out::println);
+            case "cpp", "c++" -> {
+                filename = "main.cpp";
+                compileCmd = "g++ -O2 -std=c++17 main.cpp -o main";
+                runCmd = "./main";
             }
-
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                System.err.println("Docker exited with code: " + exitCode);
+            case "python", "py" -> {
+                filename = "main.py";
+                runCmd = "python3 main.py";
             }
-
-            // Read the result file
-            Path outputFile = tmpDir.resolve("output.txt");
-            String output = Files.exists(outputFile)
-                    ? Files.readString(outputFile, StandardCharsets.UTF_8)
-                    : "No Output";
-
-            // Compare result
-            return output.trim().equals(expectedOutput.trim()) ? "Accepted" : "Wrong Answer";
-
-        } finally {
-            // Cleanup temp directory
-            Files.walk(tmpDir)
-                    .sorted(Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try { Files.deleteIfExists(path); } catch (IOException ignored) {}
-                    });
+            default -> throw new IllegalArgumentException("Unsupported language: " + language);
         }
-    }
 
-    public Submission evaluateSubmission(Long problemId, Long userId, String code, String language, String input, String output) {
-        evaluateSubmissionAsync(problemId, userId, code, language);
-        Submission s = new Submission();
-        s.setStatus("Pending");
-        s.setSubmittedAt(LocalDateTime.now());
-        return s;
+        // ✅ Write code & input files
+        Files.writeString(tmpDir.resolve(filename), code, StandardCharsets.UTF_8);
+        Files.writeString(tmpDir.resolve("input.txt"),
+                input == null ? "" : input, StandardCharsets.UTF_8);
+
+        // ✅ Inner command to run inside Docker
+        String innerCmd = String.format(
+                "cd /home/runner/work && %s && timeout 5s %s < input.txt > output.txt 2>&1",
+                compileCmd.isBlank() ? "true" : compileCmd,
+                runCmd
+        );
+
+        // ✅ Construct full docker run command
+        List<String> command = List.of(
+                dockerCmd, "run", "--rm",
+                "--network=none",
+                "--cpus=1", "--memory=256m",
+                "-v", tmpDir.toAbsolutePath() + ":/home/runner/work",
+                "shodha/judge:latest",
+                "bash", "-c", innerCmd
+        );
+
+        System.out.println("🚀 Running Docker Command: " + String.join(" ", command));
+
+        // ✅ Execute docker command
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+
+        String logs = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        int exitCode = process.waitFor();
+
+        System.out.println("🐳 Docker Exit Code: " + exitCode);
+        System.out.println("📜 Docker Logs:\n" + logs);
+
+        // ✅ Read program output
+        Path outputFile = tmpDir.resolve("output.txt");
+        String output = Files.exists(outputFile)
+                ? Files.readString(outputFile, StandardCharsets.UTF_8)
+                : "";
+
+        // ✅ Avoid null pointer on expectedOutput
+        String safeExpected = (expectedOutput == null) ? "" : expectedOutput.trim();
+        String safeOutput = output.trim();
+
+        System.out.println("🖨️ Program Output: " + safeOutput);
+        System.out.println("🧠 Expected Output: " + safeExpected);
+
+        // ✅ Exit code or mismatch handling
+        if (exitCode != 0) return "Runtime Error";
+        if (safeExpected.isEmpty()) return safeOutput.isEmpty() ? "Empty Output" : "Accepted";
+        return safeOutput.equals(safeExpected) ? "Accepted" : "Wrong Answer";
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        return "System Error";
+    } finally {
+        // ✅ Clean up temp files safely
+        Files.walk(tmpDir)
+                .sorted(Comparator.reverseOrder())
+                .forEach(path -> {
+                    try { Files.deleteIfExists(path); } catch (IOException ignored) {}
+                });
     }
+}
+
 }
