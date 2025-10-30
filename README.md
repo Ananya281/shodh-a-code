@@ -1,8 +1,8 @@
 # 🧠 Shodh-a-Code — Full Stack
 
-A *full-stack online coding contest platform* inspired by *LeetCode* and *HackerRank* — where users can explore contests, attempt coding problems, and submit solutions.
+A **full-stack online coding contest platform** inspired by **LeetCode** and **HackerRank** — where users can explore contests, attempt coding problems, and submit solutions.
 
-This repository contains both the *React (Vite) frontend* and *Spring Boot backend*, together forming the complete Shodh-a-Code assignment.
+This repository contains both the **React (Vite) frontend** and **Spring Boot backend**, together forming the complete Shodh-a-Code assignment.
 
 ---
 
@@ -26,7 +26,7 @@ shodh-a-code/
 
 # 🎨 Frontend — React + Vite
 
-A clean and responsive *React (Vite)* frontend for Shodh-a-Code, enabling users to browse contests, view problems, submit code, and track results in real-time.
+A clean and responsive **React (Vite)** frontend for Shodh-a-Code, enabling users to browse contests, view problems, submit code, and track results in real-time.
 
 ## 🚀 Features
 
@@ -59,12 +59,12 @@ frontend/
 
 | Category | Technology |
 |------------|-------------|
-| Framework | *React 18 + Vite* |
-| Styling | *Tailwind CSS* |
-| HTTP Client | *Axios* |
-| Routing | *React Router* |
-| Build Tool | *Vite* |
-| State Handling | *React Hooks (useState, useEffect)*|
+| Framework | **React 18 + Vite** |
+| Styling | **Tailwind CSS** |
+| HTTP Client | **Axios** |
+| Routing | **React Router** |
+| Build Tool | **Vite** |
+| State Handling | **React Hooks (useState, useEffect)**|
 
 ---
 
@@ -93,13 +93,13 @@ npm install
 ```
 npm run dev
 ```
-Runs at http://localhost:5173
+Runs at ``http://localhost:5173``
 
 (Ensure backend runs at port 8080)
 
 # ⚙ Backend — Spring Boot API
 
-A *Spring Boot–based backend* serving REST APIs for contests, users, problems, and submissions.
+A **Spring Boot–based backend** serving REST APIs for contests, users, problems, and submissions.
 
 ## 🚀 Features
 
@@ -135,12 +135,12 @@ backend/
 
 | Component | Technology |
 |------------|-------------|
-| Backend Framework | *Spring Boot 3.5.7* |
-| Build Tool | *Maven* |
-| Language | *Java 17 (Eclipse Adoptium JDK)* |
-| Database | *H2 (In-Memory)* |
-| ORM | *Spring Data JPA* |
-| Containerization | *Docker* (optional) |
+| Backend Framework | **Spring Boot 3.5.7** |
+| Build Tool | **Maven** |
+| Language | **Java 17 (Eclipse Adoptium JDK)** |
+| Database | **H2 (In-Memory)** |
+| ORM | **Spring Data JPA** |
+| Containerization | **Docker** (optional) |
 
 ---
 
@@ -185,11 +185,37 @@ cd backend
 mvn clean install -DskipTests
 mvn spring-boot:run
 ```
-Backend runs at http://localhost:8080
+Backend runs at ``http://localhost:8080``
 
 ### 🐳 Docker Setup
 ```
-docker build -t shodhacode-backend .
+cd backend
+docker build -t shodha/judge:latest -f docker/judge.Dockerfile .
 docker run -p 8080:8080 shodhacode-backend
 ```
+---
+
+## 👥 Example Test User
+When the backend starts, sample data is preloaded from ``data.sql``.
+You can use the following sample credentials to test:
+
+| Field | Value |
+|---------|-----------|
+| User ID | ``1`` |
+| Username | ``ananya`` |
+
+This user is linked to sample contests and problems in the H2 database.
+
+---
+
+## 🧩 Example Workflow
+
+- Run both backend and frontend locally
+- Open ``http://localhost:5173``
+- Enter:
+  - Contest ID → ``1``
+  - Username → ``ananya``
+- Select a problem, write code in Python/Java/C++
+Submit — backend executes code inside Docker, returns "Accepted" / "Wrong Answer" etc.
+
 ---
